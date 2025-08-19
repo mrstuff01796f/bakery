@@ -1,103 +1,213 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useState } from 'react';
+import dynamic from 'next/dynamic';
+import { useCart } from '@/context/CartContext';
+import { Product } from '@/context/CartContext';
+import { ClockIcon, MapPinIcon, StarIcon, FunnelIcon } from '@heroicons/react/24/outline';
+
+// Динамический импорт карты для избежания проблем с SSR
+const Map = dynamic(() => import('@/components/Map'), { ssr: false });
+
+// Моковые данные продуктов
+const mockProducts: Product[] = [
+  {
+    id: '1',
+    name: 'Набор "Утренняя свежесть"',
+    description: 'Свежий хлеб, круассаны и печенье. Идеально для завтрака!',
+    price: 299,
+    originalPrice: 599,
+    bakery: 'Пекарня "Солнечная"',
+    location: 'ул. Ленина, 15',
+    expiresAt: '2024-01-20T18:00:00',
+    image: '/api/placeholder/300/200',
+    category: 'Наборы'
+  },
+  {
+    id: '2',
+    name: 'Набор "Сладкая жизнь"',
+    description: 'Пирожные, торты и сладкая выпечка. Для сладкоежек!',
+    price: 399,
+    originalPrice: 799,
+    bakery: 'Кафе "Уют"',
+    location: 'пр. Мира, 42',
+    expiresAt: '2024-01-20T19:00:00',
+    image: '/api/placeholder/300/200',
+    category: 'Наборы'
+  },
+  {
+    id: '3',
+    name: 'Набор "Домашний"',
+    description: 'Хлеб, булочки и пирожки. Как у бабушки!',
+    price: 199,
+    originalPrice: 449,
+    bakery: 'Пекарня "Домашняя"',
+    location: 'ул. Гагарина, 8',
+    expiresAt: '2024-01-20T17:30:00',
+    image: '/api/placeholder/300/200',
+    category: 'Наборы'
+  },
+  {
+    id: '4',
+    name: 'Набор "Вечерний"',
+    description: 'Вечерняя выпечка и десерты. Завершите день вкусно!',
+    price: 349,
+    originalPrice: 699,
+    bakery: 'Пекарня "Вечерняя"',
+    location: 'ул. Пушкина, 25',
+    expiresAt: '2024-01-20T20:00:00',
+    image: '/api/placeholder/300/200',
+    category: 'Наборы'
+  }
+];
+
+export default function HomePage() {
+  const { addItem } = useCart();
+  const [selectedCategory, setSelectedCategory] = useState('Все');
+  const [showFilters, setShowFilters] = useState(false);
+
+  const categories = ['Все', 'Наборы', 'Хлеб', 'Сладости', 'Пирожки'];
+
+  const filteredProducts = selectedCategory === 'Все' 
+    ? mockProducts 
+    : mockProducts.filter(product => product.category === selectedCategory);
+
+  const formatTimeLeft = (expiresAt: string) => {
+    const now = new Date();
+    const expiry = new Date(expiresAt);
+    const diff = expiry.getTime() - now.getTime();
+    
+    if (diff <= 0) return 'Истек';
+    
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (hours > 0) return `${hours}ч ${minutes}м`;
+    return `${minutes}м`;
+  };
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="space-y-6 px-4">
+      {/* Заголовок */}
+      <div className="text-center space-y-3 pt-4">
+        <h1 className="text-2xl font-bold text-gray-800">
+          Свежие продукты по выгодным ценам
+        </h1>
+        <p className="text-base text-gray-600">
+          Покупайте качественные продукты с заканчивающимся сроком годности 
+          из лучших пекарен города
+        </p>
+      </div>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      {/* Карта */}
+      <div id="map" className="bg-white rounded-2xl shadow-lg p-4">
+        <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center">
+          <MapPinIcon className="w-5 h-5 mr-2 text-orange-500" />
+          Карта пекарен
+        </h2>
+        <div className="h-64 rounded-xl overflow-hidden">
+          <Map />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
+
+      {/* Фильтры */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-800">Фильтры</h3>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center space-x-2 text-orange-600 hover:text-orange-700 transition-colors"
+          >
+            <FunnelIcon className="w-5 h-5" />
+            <span className="text-sm font-medium">
+              {showFilters ? 'Скрыть' : 'Показать'}
+            </span>
+          </button>
+        </div>
+        
+        {showFilters && (
+          <div className="flex flex-wrap gap-2">
+            {categories.map((category) => (
+              <button
+                key={category}
+                onClick={() => setSelectedCategory(category)}
+                className={`px-4 py-2 rounded-full font-medium transition-all text-sm ${
+                  selectedCategory === category
+                    ? 'bg-orange-500 text-white shadow-lg'
+                    : 'bg-white text-gray-700 hover:bg-orange-50 border border-gray-200'
+                }`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Список продуктов */}
+      <div className="space-y-4">
+        {filteredProducts.map((product) => (
+          <div key={product.id} className="bg-white rounded-2xl shadow-lg overflow-hidden">
+            {/* Изображение продукта */}
+            <div className="h-32 bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center relative">
+              <div className="w-16 h-16 bg-gradient-to-r from-orange-400 to-amber-400 rounded-full flex items-center justify-center">
+                <span className="text-2xl">🍞</span>
+              </div>
+              {/* Скидка */}
+              <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                -{Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}%
+              </div>
+            </div>
+
+            {/* Информация о продукте */}
+            <div className="p-4 space-y-3">
+              <div>
+                <h3 className="text-lg font-bold text-gray-800">
+                  {product.name}
+                </h3>
+                <p className="text-gray-600 text-sm mt-1">{product.description}</p>
+              </div>
+
+              {/* Пекарня и время */}
+              <div className="space-y-2">
+                <div className="flex items-center text-sm text-gray-600">
+                  <StarIcon className="w-4 h-4 mr-2 text-yellow-500" />
+                  <span className="truncate">{product.bakery}</span>
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <MapPinIcon className="w-4 h-4 mr-2 text-blue-500" />
+                  <span className="truncate">{product.location}</span>
+                </div>
+                <div className="flex items-center text-sm text-red-600 font-medium">
+                  <ClockIcon className="w-4 h-4 mr-2" />
+                  Осталось: {formatTimeLeft(product.expiresAt)}
+                </div>
+              </div>
+
+              {/* Цены и кнопка */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="text-xl font-bold text-orange-600">
+                    {product.price} ₽
+                  </div>
+                  <div className="text-sm text-gray-500 line-through">
+                    {product.originalPrice} ₽
+                  </div>
+                </div>
+                <button
+                  onClick={() => addItem(product)}
+                  className="bg-gradient-to-r from-orange-500 to-amber-500 text-white px-4 py-2 rounded-lg hover:from-orange-600 hover:to-amber-600 transition-all duration-200 font-medium shadow-md active:scale-95"
+                >
+                  В корзину
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Отступ для нижней навигации */}
+      <div className="h-6"></div>
     </div>
   );
 }
