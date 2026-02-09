@@ -1,213 +1,533 @@
 'use client';
 
-import { useState } from 'react';
-import dynamic from 'next/dynamic';
-import { useCart } from '@/context/CartContext';
-import { Product } from '@/context/CartContext';
-import { ClockIcon, MapPinIcon, StarIcon, FunnelIcon } from '@heroicons/react/24/outline';
+import { useMemo, useState } from 'react';
+import {
+  ArchiveBoxIcon,
+  ChatBubbleLeftRightIcon,
+  ShoppingCartIcon,
+  HeartIcon,
+  SparklesIcon,
+  PencilSquareIcon
+} from '@heroicons/react/24/outline';
 
-// Динамический импорт карты для избежания проблем с SSR
-const Map = dynamic(() => import('@/components/Map'), { ssr: false });
+const today = new Date();
 
-// Моковые данные продуктов
-const mockProducts: Product[] = [
+const addDays = (date: Date, days: number) => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+};
+
+type FridgeItem = {
+  id: string;
+  name: string;
+  quantity: string;
+  autoExpiresAt: string;
+  manualExpiresAt?: string;
+  category: string;
+};
+
+type Message = {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+};
+
+type ShoppingItem = {
+  id: string;
+  title: string;
+  note: string;
+};
+
+type FavoriteRecipe = {
+  id: string;
+  title: string;
+  ingredients: string;
+  notes: string;
+};
+
+const initialFridgeItems: FridgeItem[] = [
   {
     id: '1',
-    name: 'Набор "Утренняя свежесть"',
-    description: 'Свежий хлеб, круассаны и печенье. Идеально для завтрака!',
-    price: 299,
-    originalPrice: 599,
-    bakery: 'Пекарня "Солнечная"',
-    location: 'ул. Ленина, 15',
-    expiresAt: '2024-01-20T18:00:00',
-    image: '/api/placeholder/300/200',
-    category: 'Наборы'
+    name: 'Куриное филе',
+    quantity: '400 г',
+    autoExpiresAt: addDays(today, 2).toISOString(),
+    category: 'Белки'
   },
   {
     id: '2',
-    name: 'Набор "Сладкая жизнь"',
-    description: 'Пирожные, торты и сладкая выпечка. Для сладкоежек!',
-    price: 399,
-    originalPrice: 799,
-    bakery: 'Кафе "Уют"',
-    location: 'пр. Мира, 42',
-    expiresAt: '2024-01-20T19:00:00',
-    image: '/api/placeholder/300/200',
-    category: 'Наборы'
+    name: 'Брокколи',
+    quantity: '1 кочан',
+    autoExpiresAt: addDays(today, 4).toISOString(),
+    category: 'Овощи'
   },
   {
     id: '3',
-    name: 'Набор "Домашний"',
-    description: 'Хлеб, булочки и пирожки. Как у бабушки!',
-    price: 199,
-    originalPrice: 449,
-    bakery: 'Пекарня "Домашняя"',
-    location: 'ул. Гагарина, 8',
-    expiresAt: '2024-01-20T17:30:00',
-    image: '/api/placeholder/300/200',
-    category: 'Наборы'
+    name: 'Рис жасмин',
+    quantity: '300 г',
+    autoExpiresAt: addDays(today, 60).toISOString(),
+    category: 'Крупы'
   },
   {
     id: '4',
-    name: 'Набор "Вечерний"',
-    description: 'Вечерняя выпечка и десерты. Завершите день вкусно!',
-    price: 349,
-    originalPrice: 699,
-    bakery: 'Пекарня "Вечерняя"',
-    location: 'ул. Пушкина, 25',
-    expiresAt: '2024-01-20T20:00:00',
-    image: '/api/placeholder/300/200',
-    category: 'Наборы'
+    name: 'Сливки 20%',
+    quantity: '250 мл',
+    autoExpiresAt: addDays(today, 5).toISOString(),
+    category: 'Молочное'
+  }
+];
+
+const preferenceOptions = [
+  'Нежный вкус',
+  'Пряное',
+  'Сытное мясное',
+  'Легкое овощное',
+  'Суп',
+  'Салат'
+];
+
+const recipeSuggestions = [
+  {
+    label: 'Нежный вкус',
+    ideas: ['Крем-суп из брокколи со сливками', 'Паста с нежным сливочным соусом']
+  },
+  {
+    label: 'Пряное',
+    ideas: ['Томатное рагу с копченой паприкой', 'Пряный рис с овощами']
+  },
+  {
+    label: 'Сытное мясное',
+    ideas: ['Курица в сливочном соусе с рисом', 'Запеченное филе с пряными травами']
+  },
+  {
+    label: 'Легкое овощное',
+    ideas: ['Теплый салат с брокколи', 'Овощная тарелка с дипом']
+  },
+  {
+    label: 'Суп',
+    ideas: ['Суп-пюре из брокколи', 'Куриный бульон с рисом']
+  },
+  {
+    label: 'Салат',
+    ideas: ['Салат с курицей и легкой заправкой', 'Салат из свежих овощей']
   }
 ];
 
 export default function HomePage() {
-  const { addItem } = useCart();
-  const [selectedCategory, setSelectedCategory] = useState('Все');
-  const [showFilters, setShowFilters] = useState(false);
+  const [fridgeItems, setFridgeItems] = useState(initialFridgeItems);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemQuantity, setNewItemQuantity] = useState('');
+  const [newItemShelfLife, setNewItemShelfLife] = useState(3);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: 'welcome',
+      role: 'assistant',
+      text: 'Привет! Я помогу подобрать блюдо строго из того, что есть в холодильнике.'
+    }
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([]);
+  const [shoppingTitle, setShoppingTitle] = useState('');
+  const [shoppingNote, setShoppingNote] = useState('');
+  const [selectedPreferences, setSelectedPreferences] = useState<string[]>(['Суп']);
+  const [favoriteRecipes, setFavoriteRecipes] = useState<FavoriteRecipe[]>([
+    {
+      id: 'fav-1',
+      title: 'Курица в сливочном соусе',
+      ingredients: 'Куриное филе, сливки, чеснок, травы, соль',
+      notes: 'Добавить больше тимьяна и щепотку мускатного ореха.'
+    },
+    {
+      id: 'fav-2',
+      title: 'Теплый салат с брокколи',
+      ingredients: 'Брокколи, лимон, оливковое масло, семена кунжута',
+      notes: 'В следующий раз добавить хлопья чили.'
+    }
+  ]);
 
-  const categories = ['Все', 'Наборы', 'Хлеб', 'Сладости', 'Пирожки'];
+  const fridgeProductsList = useMemo(
+    () => fridgeItems.map((item) => item.name).join(', '),
+    [fridgeItems]
+  );
 
-  const filteredProducts = selectedCategory === 'Все' 
-    ? mockProducts 
-    : mockProducts.filter(product => product.category === selectedCategory);
+  const formatDate = (isoDate: string) =>
+    new Date(isoDate).toLocaleDateString('ru-RU', {
+      day: '2-digit',
+      month: 'short'
+    });
 
-  const formatTimeLeft = (expiresAt: string) => {
-    const now = new Date();
-    const expiry = new Date(expiresAt);
-    const diff = expiry.getTime() - now.getTime();
-    
-    if (diff <= 0) return 'Истек';
-    
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (hours > 0) return `${hours}ч ${minutes}м`;
-    return `${minutes}м`;
+  const getDaysLeft = (isoDate: string) => {
+    const diff = new Date(isoDate).getTime() - new Date().getTime();
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  };
+
+  const handleManualExpiry = (id: string, value: string) => {
+    setFridgeItems((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              manualExpiresAt: value ? new Date(value).toISOString() : undefined
+            }
+          : item
+      )
+    );
+  };
+
+  const handleResetExpiry = (id: string) => {
+    setFridgeItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, manualExpiresAt: undefined } : item))
+    );
+  };
+
+  const handleAddItem = () => {
+    if (!newItemName.trim()) return;
+    const created = addDays(new Date(), newItemShelfLife).toISOString();
+    setFridgeItems((prev) => [
+      {
+        id: `${Date.now()}`,
+        name: newItemName.trim(),
+        quantity: newItemQuantity.trim() || '1 шт',
+        autoExpiresAt: created,
+        category: 'Новое'
+      },
+      ...prev
+    ]);
+    setNewItemName('');
+    setNewItemQuantity('');
+    setNewItemShelfLife(3);
+  };
+
+  const handleSendMessage = () => {
+    if (!chatInput.trim()) return;
+    const userMessage: Message = {
+      id: `${Date.now()}-user`,
+      role: 'user',
+      text: chatInput.trim()
+    };
+
+    const suggestions = fridgeItems
+      .slice(0, 3)
+      .map((item) => `• ${item.name}`)
+      .join('\n');
+
+    const assistantMessage: Message = {
+      id: `${Date.now()}-assistant`,
+      role: 'assistant',
+      text: `Использую только продукты из холодильника: ${fridgeProductsList}.
+
+Предлагаю такие варианты:
+${suggestions}
+
+Если хочешь, напиши формат блюда: суп, салат или горячее.`
+    };
+
+    setMessages((prev) => [...prev, userMessage, assistantMessage]);
+    setChatInput('');
+  };
+
+  const handleAddShoppingItem = () => {
+    if (!shoppingTitle.trim()) return;
+    setShoppingItems((prev) => [
+      {
+        id: `${Date.now()}`,
+        title: shoppingTitle.trim(),
+        note: shoppingNote.trim()
+      },
+      ...prev
+    ]);
+    setShoppingTitle('');
+    setShoppingNote('');
+  };
+
+  const togglePreference = (preference: string) => {
+    setSelectedPreferences((prev) =>
+      prev.includes(preference)
+        ? prev.filter((item) => item !== preference)
+        : [...prev, preference]
+    );
+  };
+
+  const currentSuggestions = recipeSuggestions.filter((suggestion) =>
+    selectedPreferences.includes(suggestion.label)
+  );
+
+  const updateFavoriteRecipe = (id: string, changes: Partial<FavoriteRecipe>) => {
+    setFavoriteRecipes((prev) =>
+      prev.map((recipe) => (recipe.id === id ? { ...recipe, ...changes } : recipe))
+    );
   };
 
   return (
-    <div className="space-y-6 px-4">
-      {/* Заголовок */}
-      <div className="text-center space-y-3 pt-4">
+    <div className="space-y-10 px-4 pb-4">
+      <section className="pt-4 text-center space-y-3">
         <h1 className="text-2xl font-bold text-gray-800">
-          Свежие продукты по выгодным ценам
+          Планируйте блюда из того, что уже есть дома
         </h1>
         <p className="text-base text-gray-600">
-          Покупайте качественные продукты с заканчивающимся сроком годности 
-          из лучших пекарен города
+          Холодильник хранит продукты и срок годности, чат помогает придумать блюда, а магазин —
+          собрать список покупок и идей.
         </p>
-      </div>
+      </section>
 
-      {/* Карта */}
-      <div id="map" className="bg-white rounded-2xl shadow-lg p-4">
-        <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center">
-          <MapPinIcon className="w-5 h-5 mr-2 text-orange-500" />
-          Карта пекарен
-        </h2>
-        <div className="h-64 rounded-xl overflow-hidden">
-          <Map />
-        </div>
-      </div>
-
-      {/* Фильтры */}
-      <div className="space-y-3">
+      <section id="fridge" className="space-y-4 scroll-mt-24">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-800">Фильтры</h3>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center space-x-2 text-orange-600 hover:text-orange-700 transition-colors"
-          >
-            <FunnelIcon className="w-5 h-5" />
-            <span className="text-sm font-medium">
-              {showFilters ? 'Скрыть' : 'Показать'}
-            </span>
-          </button>
+          <div>
+            <h2 className="text-lg font-bold text-gray-800 flex items-center">
+              <ArchiveBoxIcon className="w-5 h-5 mr-2 text-emerald-500" />
+              Холодильник
+            </h2>
+            <p className="text-sm text-gray-500">Автоматический срок годности можно заменить вручную.</p>
+          </div>
+          <span className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full">
+            {fridgeItems.length} позиции
+          </span>
         </div>
-        
-        {showFilters && (
-          <div className="flex flex-wrap gap-2">
-            {categories.map((category) => (
+
+        <div className="bg-white rounded-2xl shadow-lg p-4 space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <input
+              value={newItemName}
+              onChange={(event) => setNewItemName(event.target.value)}
+              placeholder="Продукт"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
+            />
+            <input
+              value={newItemQuantity}
+              onChange={(event) => setNewItemQuantity(event.target.value)}
+              placeholder="Количество"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
+            />
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                value={newItemShelfLife}
+                onChange={(event) => setNewItemShelfLife(Number(event.target.value))}
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm w-20"
+              />
+              <span className="text-xs text-gray-500">дней</span>
               <button
-                key={category}
-                onClick={() => setSelectedCategory(category)}
-                className={`px-4 py-2 rounded-full font-medium transition-all text-sm ${
-                  selectedCategory === category
-                    ? 'bg-orange-500 text-white shadow-lg'
-                    : 'bg-white text-gray-700 hover:bg-orange-50 border border-gray-200'
+                onClick={handleAddItem}
+                className="ml-auto bg-emerald-500 text-white px-3 py-2 rounded-lg text-sm hover:bg-emerald-600 transition"
+              >
+                Добавить
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {fridgeItems.map((item) => {
+            const activeExpiry = item.manualExpiresAt ?? item.autoExpiresAt;
+            const daysLeft = getDaysLeft(activeExpiry);
+            return (
+              <div key={item.id} className="bg-white rounded-2xl shadow-lg p-4 space-y-3">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-800">{item.name}</h3>
+                    <p className="text-sm text-gray-500">{item.quantity} • {item.category}</p>
+                  </div>
+                  <span className="text-xs bg-amber-100 text-amber-700 px-3 py-1 rounded-full">
+                    Осталось {daysLeft} дн.
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 items-end">
+                  <div className="text-xs text-gray-500">
+                    Авто срок: <span className="font-medium text-gray-700">{formatDate(item.autoExpiresAt)}</span>
+                  </div>
+                  <label className="text-xs text-gray-500 flex flex-col">
+                    Вручную
+                    <input
+                      type="date"
+                      value={item.manualExpiresAt ? item.manualExpiresAt.split('T')[0] : ''}
+                      onChange={(event) => handleManualExpiry(item.id, event.target.value)}
+                      className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </label>
+                  <button
+                    onClick={() => handleResetExpiry(item.id)}
+                    className="text-xs text-emerald-600 hover:text-emerald-700 text-left"
+                  >
+                    Сбросить на авто
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section id="chat" className="space-y-4 scroll-mt-24">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-800 flex items-center">
+            <ChatBubbleLeftRightIcon className="w-5 h-5 mr-2 text-emerald-500" />
+            Чат с помощником
+          </h2>
+          <span className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full">Только продукты из холодильника</span>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-lg p-4 space-y-3">
+          <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`rounded-2xl px-4 py-3 text-sm whitespace-pre-line ${
+                  message.role === 'user'
+                    ? 'bg-emerald-500 text-white ml-auto'
+                    : 'bg-emerald-50 text-gray-700'
                 }`}
               >
-                {category}
+                {message.text}
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              value={chatInput}
+              onChange={(event) => setChatInput(event.target.value)}
+              placeholder="Спроси: что приготовить на ужин?"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1"
+            />
+            <button
+              onClick={handleSendMessage}
+              className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-600 transition"
+            >
+              Отправить
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="shop" className="space-y-4 scroll-mt-24">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-800 flex items-center">
+            <ShoppingCartIcon className="w-5 h-5 mr-2 text-emerald-500" />
+            Магазин
+          </h2>
+          <span className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full">Список покупок</span>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-lg p-4 space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <input
+              value={shoppingTitle}
+              onChange={(event) => setShoppingTitle(event.target.value)}
+              placeholder="Что нужно купить"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
+            />
+            <input
+              value={shoppingNote}
+              onChange={(event) => setShoppingNote(event.target.value)}
+              placeholder="Комментарий: для салата, для супа"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
+            />
+            <button
+              onClick={handleAddShoppingItem}
+              className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-600 transition"
+            >
+              В список
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {preferenceOptions.map((option) => (
+              <button
+                key={option}
+                onClick={() => togglePreference(option)}
+                className={`px-3 py-2 rounded-full text-xs font-medium border transition ${
+                  selectedPreferences.includes(option)
+                    ? 'bg-emerald-500 text-white border-emerald-500'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300'
+                }`}
+              >
+                {option}
               </button>
             ))}
           </div>
-        )}
-      </div>
+        </div>
 
-      {/* Список продуктов */}
-      <div className="space-y-4">
-        {filteredProducts.map((product) => (
-          <div key={product.id} className="bg-white rounded-2xl shadow-lg overflow-hidden">
-            {/* Изображение продукта */}
-            <div className="h-32 bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center relative">
-              <div className="w-16 h-16 bg-gradient-to-r from-orange-400 to-amber-400 rounded-full flex items-center justify-center">
-                <span className="text-2xl">🍞</span>
-              </div>
-              {/* Скидка */}
-              <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold">
-                -{Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}%
-              </div>
-            </div>
-
-            {/* Информация о продукте */}
-            <div className="p-4 space-y-3">
-              <div>
-                <h3 className="text-lg font-bold text-gray-800">
-                  {product.name}
-                </h3>
-                <p className="text-gray-600 text-sm mt-1">{product.description}</p>
-              </div>
-
-              {/* Пекарня и время */}
-              <div className="space-y-2">
-                <div className="flex items-center text-sm text-gray-600">
-                  <StarIcon className="w-4 h-4 mr-2 text-yellow-500" />
-                  <span className="truncate">{product.bakery}</span>
-                </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <MapPinIcon className="w-4 h-4 mr-2 text-blue-500" />
-                  <span className="truncate">{product.location}</span>
-                </div>
-                <div className="flex items-center text-sm text-red-600 font-medium">
-                  <ClockIcon className="w-4 h-4 mr-2" />
-                  Осталось: {formatTimeLeft(product.expiresAt)}
-                </div>
-              </div>
-
-              {/* Цены и кнопка */}
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <div className="text-xl font-bold text-orange-600">
-                    {product.price} ₽
-                  </div>
-                  <div className="text-sm text-gray-500 line-through">
-                    {product.originalPrice} ₽
-                  </div>
-                </div>
-                <button
-                  onClick={() => addItem(product)}
-                  className="bg-gradient-to-r from-orange-500 to-amber-500 text-white px-4 py-2 rounded-lg hover:from-orange-600 hover:to-amber-600 transition-all duration-200 font-medium shadow-md active:scale-95"
-                >
-                  В корзину
-                </button>
-              </div>
-            </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="bg-white rounded-2xl shadow-lg p-4 space-y-3">
+            <h3 className="text-sm font-semibold text-gray-700">Список покупок</h3>
+            {shoppingItems.length === 0 ? (
+              <p className="text-xs text-gray-500">Пока ничего не добавлено.</p>
+            ) : (
+              <ul className="space-y-2">
+                {shoppingItems.map((item) => (
+                  <li key={item.id} className="text-sm text-gray-700">
+                    <span className="font-medium">{item.title}</span>
+                    {item.note && <span className="text-xs text-gray-500"> — {item.note}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-        ))}
-      </div>
+          <div className="bg-white rounded-2xl shadow-lg p-4 space-y-3">
+            <h3 className="text-sm font-semibold text-gray-700 flex items-center">
+              <SparklesIcon className="w-4 h-4 mr-2 text-emerald-500" />
+              Идеи по вашим вкусам
+            </h3>
+            {currentSuggestions.length === 0 ? (
+              <p className="text-xs text-gray-500">Выберите предпочтения, чтобы получить подсказки.</p>
+            ) : (
+              <div className="space-y-3">
+                {currentSuggestions.map((suggestion) => (
+                  <div key={suggestion.label}>
+                    <p className="text-xs font-semibold text-gray-600">{suggestion.label}</p>
+                    <ul className="text-sm text-gray-700 list-disc list-inside">
+                      {suggestion.ideas.map((idea) => (
+                        <li key={idea}>{idea}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
 
-      {/* Отступ для нижней навигации */}
-      <div className="h-6"></div>
+      <section id="favorites" className="space-y-4 scroll-mt-24">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-800 flex items-center">
+            <HeartIcon className="w-5 h-5 mr-2 text-emerald-500" />
+            Избранные рецепты
+          </h2>
+          <span className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full">
+            Можно редактировать
+          </span>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          {favoriteRecipes.map((recipe) => (
+            <div key={recipe.id} className="bg-white rounded-2xl shadow-lg p-4 space-y-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-800">{recipe.title}</h3>
+                  <p className="text-xs text-gray-500">Ингредиенты</p>
+                </div>
+                <PencilSquareIcon className="w-5 h-5 text-emerald-400" />
+              </div>
+              <textarea
+                value={recipe.ingredients}
+                onChange={(event) => updateFavoriteRecipe(recipe.id, { ingredients: event.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                rows={3}
+              />
+              <div>
+                <p className="text-xs text-gray-500">Правки и специи</p>
+                <textarea
+                  value={recipe.notes}
+                  onChange={(event) => updateFavoriteRecipe(recipe.id, { notes: event.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  rows={3}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
